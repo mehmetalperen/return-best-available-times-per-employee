@@ -97,13 +97,18 @@ export default async function handler(req, res) {
             });
         }
 
-        // Handle both single object and array formats
+        // Handle different input formats
         let employeesArray;
         if (Array.isArray(employees)) {
             employeesArray = employees;
         } else if (typeof employees === 'object') {
-            // Convert single object to array
-            employeesArray = [employees];
+            // Check if it's Make.com format with nested 'array' property
+            if (employees.array && Array.isArray(employees.array)) {
+                employeesArray = employees.array;
+            } else {
+                // Convert single object to array
+                employeesArray = [employees];
+            }
         } else {
             return res.status(400).json({
                 error: 'employees must be an object or array'
@@ -180,8 +185,8 @@ export default async function handler(req, res) {
         // Handle target employee availability
         let availabilityTargetEmployee = null;
         if (target_employee) {
-        // Find the target employee in the employees array
-        const targetEmp = employeesArray.find(emp =>
+            // Find the target employee in the employees array
+            const targetEmp = employeesArray.find(emp =>
                 emp.id === target_employee.id ||
                 emp.name === target_employee.name
             );
