@@ -1,4 +1,4 @@
-const { VercelRequest, VercelResponse } = require('@vercel/node');
+// Vercel API handler
 
 /**
  * Calculates the time difference in minutes between two time strings
