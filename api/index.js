@@ -99,14 +99,12 @@ export default async function handler(req, res) {
 
         // Extract requested time from ISO string
         const requestedTime = extractTimeFromISO(client_booking_time);
+        const requestedDate = new Date(client_booking_time).toISOString().split('T')[0];
 
         // Process each employee
         const results = employees.map(employee => {
             const employeeId = employee.id;
             const employeeName = employee.name;
-
-            // Extract available times for the requested date
-            const requestedDate = new Date(client_booking_time).toISOString().split('T')[0];
             const availableTimes = employee.data?.result?.[requestedDate] || [];
 
             // Find best available times
