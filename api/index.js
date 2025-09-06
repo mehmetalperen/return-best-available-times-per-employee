@@ -82,7 +82,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { client_booking_time, employees } = req.body;
+        const { client_booking_time, employees, target_employee } = req.body;
 
         // Validate input
         if (!client_booking_time) {
@@ -143,6 +143,65 @@ export default async function handler(req, res) {
             return 0;
         });
 
+        // Create best_availability field with top 3 best times across all employees
+        const allBestTimes = [];
+        results.forEach(employee => {
+            if (employee.has_availability) {
+                employee.best_available_times.forEach(time => {
+                    const difference = getTimeDifferenceInMinutes(time, requestedTime);
+                    allBestTimes.push({
+                        employee_id: employee.id,
+                        employee_name: employee.name,
+                        employee_email: employee.email,
+                        employee_phone: employee.phone,
+                        employee_description: employee.description,
+                        availability_time: time,
+                        time_difference_minutes: difference
+                    });
+                });
+            }
+        });
+
+        // Sort by time difference and take top 3
+        allBestTimes.sort((a, b) => a.time_difference_minutes - b.time_difference_minutes);
+        const bestAvailability = allBestTimes.slice(0, 3);
+
+        // Handle target employee availability
+        let availabilityTargetEmployee = null;
+        if (target_employee) {
+            // Find the target employee in the employees array
+            const targetEmp = employees.find(emp =>
+                emp.id === target_employee.id ||
+                emp.name === target_employee.name
+            );
+
+            if (targetEmp) {
+                const targetAvailableTimes = targetEmp.data?.result?.[requestedDate] || [];
+                const targetBestTimes = findBestAvailableTimes(targetAvailableTimes, requestedTime, 3);
+
+                // Format results with employee details like best_availability
+                const formattedResults = targetBestTimes.map(time => ({
+                    employee_id: targetEmp.id,
+                    employee_name: targetEmp.name,
+                    employee_email: targetEmp.email,
+                    employee_phone: targetEmp.phone,
+                    employee_description: targetEmp.description,
+                    availability_time: time,
+                    time_difference_minutes: getTimeDifferenceInMinutes(time, requestedTime)
+                }));
+
+                availabilityTargetEmployee = {
+                    results: formattedResults,
+                    success: formattedResults.length > 0
+                };
+            } else {
+                availabilityTargetEmployee = {
+                    results: [],
+                    success: false
+                };
+            }
+        }
+
         return res.status(200).json({
             success: true,
             requested_booking_time: client_booking_time,
@@ -150,6 +209,8 @@ export default async function handler(req, res) {
             requested_date: requestedDate,
             total_employees: employees.length,
             employees_with_availability: results.filter(emp => emp.has_availability).length,
+            best_availability: bestAvailability,
+            availability_target_employee: availabilityTargetEmployee,
             results
         });
 
