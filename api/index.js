@@ -56,8 +56,16 @@ function findBestAvailableTimes(availableTimes, requestedTime, maxResults = 3) {
  * @returns {string} - Time in HH:MM:SS format
  */
 function extractTimeFromISO(isoString) {
-    const date = new Date(isoString);
-    return date.toTimeString().split(' ')[0]; // Gets HH:MM:SS part
+  // Extract time directly from ISO string without timezone conversion
+  // Format: "2025-09-10T09:00:00-05:00" -> "09:00:00"
+  const timeMatch = isoString.match(/T(\d{2}:\d{2}:\d{2})/);
+  if (timeMatch) {
+    return timeMatch[1];
+  }
+  
+  // Fallback to date parsing if regex fails
+  const date = new Date(isoString);
+  return date.toTimeString().split(' ')[0];
 }
 
 /**
