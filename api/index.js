@@ -91,9 +91,22 @@ export default async function handler(req, res) {
             });
         }
 
-        if (!employees || !Array.isArray(employees)) {
+        if (!employees) {
             return res.status(400).json({
-                error: 'employees array is required'
+                error: 'employees is required'
+            });
+        }
+
+        // Handle both single object and array formats
+        let employeesArray;
+        if (Array.isArray(employees)) {
+            employeesArray = employees;
+        } else if (typeof employees === 'object') {
+            // Convert single object to array
+            employeesArray = [employees];
+        } else {
+            return res.status(400).json({
+                error: 'employees must be an object or array'
             });
         }
 
@@ -102,7 +115,7 @@ export default async function handler(req, res) {
         const requestedDate = new Date(client_booking_time).toISOString().split('T')[0];
 
         // Process each employee
-        const results = employees.map(employee => {
+        const results = employeesArray.map(employee => {
             const employeeId = employee.id;
             const employeeName = employee.name;
             const availableTimes = employee.data?.result?.[requestedDate] || [];
@@ -167,8 +180,8 @@ export default async function handler(req, res) {
         // Handle target employee availability
         let availabilityTargetEmployee = null;
         if (target_employee) {
-            // Find the target employee in the employees array
-            const targetEmp = employees.find(emp =>
+        // Find the target employee in the employees array
+        const targetEmp = employeesArray.find(emp =>
                 emp.id === target_employee.id ||
                 emp.name === target_employee.name
             );
@@ -205,7 +218,7 @@ export default async function handler(req, res) {
             requested_booking_time: client_booking_time,
             requested_time: requestedTime,
             requested_date: requestedDate,
-            total_employees: employees.length,
+            total_employees: employeesArray.length,
             employees_with_availability: results.filter(emp => emp.has_availability).length,
             best_availability: bestAvailability,
             availability_target_employee: availabilityTargetEmployee,
