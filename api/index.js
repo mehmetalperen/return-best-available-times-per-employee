@@ -56,16 +56,16 @@ function findBestAvailableTimes(availableTimes, requestedTime, maxResults = 3) {
  * @returns {string} - Time in HH:MM:SS format
  */
 function extractTimeFromISO(isoString) {
-  // Extract time directly from ISO string without timezone conversion
-  // Format: "2025-09-10T09:00:00-05:00" -> "09:00:00"
-  const timeMatch = isoString.match(/T(\d{2}:\d{2}:\d{2})/);
-  if (timeMatch) {
-    return timeMatch[1];
-  }
-  
-  // Fallback to date parsing if regex fails
-  const date = new Date(isoString);
-  return date.toTimeString().split(' ')[0];
+    // Extract time directly from ISO string without timezone conversion
+    // Format: "2025-09-10T09:00:00-05:00" -> "09:00:00"
+    const timeMatch = isoString.match(/T(\d{2}:\d{2}:\d{2})/);
+    if (timeMatch) {
+        return timeMatch[1];
+    }
+
+    // Fallback to date parsing if regex fails
+    const date = new Date(isoString);
+    return date.toTimeString().split(' ')[0];
 }
 
 /**
@@ -125,7 +125,10 @@ export default async function handler(req, res) {
 
         // Extract requested time from ISO string
         const requestedTime = extractTimeFromISO(client_booking_time);
-        const requestedDate = new Date(client_booking_time).toISOString().split('T')[0];
+        // Extract date from ISO string without timezone conversion to avoid UTC conversion issues
+        // Use regex to extract date part before 'T' to avoid any timezone conversion
+        const dateMatch = client_booking_time.match(/^(\d{4}-\d{2}-\d{2})T/);
+        const requestedDate = dateMatch ? dateMatch[1] : client_booking_time.split('T')[0];
 
         // Process each employee
         const results = employeesArray.map(employee => {
