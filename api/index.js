@@ -17,6 +17,20 @@ function getTimeDifferenceInMinutes(time1, time2) {
 }
 
 /**
+ * Checks if a time is on or after a threshold time (HH:MM:SS)
+ * @param {string} time - Time in HH:MM:SS format
+ * @param {string} threshold - Threshold time in HH:MM:SS format
+ * @returns {boolean}
+ */
+function isTimeOnOrAfter(time, threshold) {
+    const [h1, m1, s1] = time.split(':').map(Number);
+    const [h2, m2, s2] = threshold.split(':').map(Number);
+    const t1 = h1 * 3600 + m1 * 60 + s1;
+    const t2 = h2 * 3600 + m2 * 60 + s2;
+    return t1 >= t2;
+}
+
+/**
  * Finds the best available times for an employee based on the requested booking time
  * @param {Array} availableTimes - Array of available time strings
  * @param {string} requestedTime - The requested booking time in HH:MM:SS format
@@ -90,12 +104,26 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { client_booking_time, employees, target_employee } = req.body;
+        const { client_booking_time, employees, target_employee, current_client_time } = req.body;
 
         // Validate input
         if (!client_booking_time) {
             return res.status(400).json({
                 error: 'client_booking_time is required'
+            });
+        }
+
+        if (!current_client_time) {
+            return res.status(400).json({
+                error: 'current_client_time is required (HH:MM:SS)'
+            });
+        }
+
+        // Ensure current_client_time is in HH:MM:SS format, no timezone handling
+        const timeFormatRegex = /^\d{2}:\d{2}:\d{2}$/;
+        if (!timeFormatRegex.test(current_client_time)) {
+            return res.status(400).json({
+                error: 'current_client_time must be in HH:MM:SS format'
             });
         }
 
@@ -136,8 +164,11 @@ export default async function handler(req, res) {
             const employeeName = employee.name;
             const availableTimes = employee.data?.result?.[requestedDate] || [];
 
+            // Filter out times before current_client_time (no timezone logic)
+            const availableTimesOnOrAfter = availableTimes.filter(time => isTimeOnOrAfter(time, current_client_time));
+
             // Find best available times
-            const bestTimes = findBestAvailableTimes(availableTimes, requestedTime, 3);
+            const bestTimes = findBestAvailableTimes(availableTimesOnOrAfter, requestedTime, 3);
 
             return {
                 id: employeeId,
@@ -204,7 +235,8 @@ export default async function handler(req, res) {
 
             if (targetEmp) {
                 const targetAvailableTimes = targetEmp.data?.result?.[requestedDate] || [];
-                const targetBestTimes = findBestAvailableTimes(targetAvailableTimes, requestedTime, 3);
+                const targetAvailableTimesOnOrAfter = targetAvailableTimes.filter(time => isTimeOnOrAfter(time, current_client_time));
+                const targetBestTimes = findBestAvailableTimes(targetAvailableTimesOnOrAfter, requestedTime, 3);
 
                 // Format results with employee details like best_availability
                 const formattedResults = targetBestTimes.map(time => ({
@@ -234,6 +266,7 @@ export default async function handler(req, res) {
             requested_booking_time: client_booking_time,
             requested_time: requestedTime,
             requested_date: requestedDate,
+            current_client_time,
             total_employees: employeesArray.length,
             employees_with_availability: results.filter(emp => emp.has_availability).length,
             best_availability: bestAvailability,
