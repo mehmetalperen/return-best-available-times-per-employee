@@ -115,17 +115,23 @@ export default async function handler(req, res) {
 
         if (!current_client_time) {
             return res.status(400).json({
-                error: 'current_client_time is required (HH:MM:SS)'
+                error: 'current_client_time is required (format: "YYYY-MM-DD HH:MM:SS")'
             });
         }
 
-        // Ensure current_client_time is in HH:MM:SS format, no timezone handling
-        const timeFormatRegex = /^\d{2}:\d{2}:\d{2}$/;
-        if (!timeFormatRegex.test(current_client_time)) {
+        // Parse current_client_time - must be in "YYYY-MM-DD HH:MM:SS" format
+        // Example: "2025-11-03 08:34:57"
+        const datetimeFormatRegex = /^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})$/;
+
+        if (!datetimeFormatRegex.test(current_client_time)) {
             return res.status(400).json({
-                error: 'current_client_time must be in HH:MM:SS format'
+                error: 'current_client_time must be in "YYYY-MM-DD HH:MM:SS" format (e.g., "2025-11-03 08:34:57")'
             });
         }
+
+        const match = current_client_time.match(datetimeFormatRegex);
+        const currentClientDate = match[1];
+        const currentClientTime = match[2];
 
         if (!employees) {
             return res.status(400).json({
@@ -158,14 +164,19 @@ export default async function handler(req, res) {
         const dateMatch = client_booking_time.match(/^(\d{4}-\d{2}-\d{2})T/);
         const requestedDate = dateMatch ? dateMatch[1] : client_booking_time.split('T')[0];
 
+        // Determine if we should filter by time - only if requesting for today
+        const shouldFilterByTime = requestedDate === currentClientDate;
+
         // Process each employee
         const results = employeesArray.map(employee => {
             const employeeId = employee.id;
             const employeeName = employee.name;
             const availableTimes = employee.data?.result?.[requestedDate] || [];
 
-            // Filter out times before current_client_time (no timezone logic)
-            const availableTimesOnOrAfter = availableTimes.filter(time => isTimeOnOrAfter(time, current_client_time));
+            // Filter out times before current_client_time only if requesting for today
+            const availableTimesOnOrAfter = shouldFilterByTime
+                ? availableTimes.filter(time => isTimeOnOrAfter(time, currentClientTime))
+                : availableTimes;
 
             // Find best available times
             const bestTimes = findBestAvailableTimes(availableTimesOnOrAfter, requestedTime, 3);
@@ -235,7 +246,10 @@ export default async function handler(req, res) {
 
             if (targetEmp) {
                 const targetAvailableTimes = targetEmp.data?.result?.[requestedDate] || [];
-                const targetAvailableTimesOnOrAfter = targetAvailableTimes.filter(time => isTimeOnOrAfter(time, current_client_time));
+                // Filter out times before current_client_time only if requesting for today
+                const targetAvailableTimesOnOrAfter = shouldFilterByTime
+                    ? targetAvailableTimes.filter(time => isTimeOnOrAfter(time, currentClientTime))
+                    : targetAvailableTimes;
                 const targetBestTimes = findBestAvailableTimes(targetAvailableTimesOnOrAfter, requestedTime, 3);
 
                 // Format results with employee details like best_availability
@@ -267,6 +281,9 @@ export default async function handler(req, res) {
             requested_time: requestedTime,
             requested_date: requestedDate,
             current_client_time,
+            current_client_date: currentClientDate,
+            current_client_time_only: currentClientTime,
+            should_filter_by_time: shouldFilterByTime,
             total_employees: employeesArray.length,
             employees_with_availability: results.filter(emp => emp.has_availability).length,
             best_availability: bestAvailability,
